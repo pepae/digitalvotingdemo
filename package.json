@@ -1,0 +1,15 @@
+{
+  "name": "demo-vote-electronique-resah",
+  "version": "1.0.0",
+  "description": "Démonstration (maquette fonctionnelle) des solutions de vote à distance et en séance pour l’AOO Resah 2026-R032 : un seul fichier HTML autonome.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "esbuild": "^0.24.2",
+    "preact": "^10.29.8",
+    "qrcode-generator": "^1.4.4"
+  },
+  "private": true
+}

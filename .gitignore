@@ -1,0 +1,7 @@
+node_modules/
+dist/
+tests/shots/
+__pycache__/
+.claude/
+# Notes internes de l'appel d'offres : ne pas publier
+HANDOVER.md

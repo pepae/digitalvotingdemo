@@ -1,0 +1,70 @@
+import os, pathlib
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+import json
+from playwright.sync_api import sync_playwright
+OUT = os.environ.get('SHOTS_DIR', str(ROOT / 'tests' / 'shots')) + '/'
+os.makedirs(OUT, exist_ok=True)
+URL = os.environ.get('DEMO_URL', (ROOT / 'dist' / 'index.html').as_uri())
+errors = []
+def shot(pg, n, full=True): pg.screenshot(path=OUT + 'fs_' + n + '.png', full_page=full)
+with sync_playwright() as p:
+    b = p.chromium.launch()
+    ctx = b.new_context(viewport={'width': 1440, 'height': 900})
+    org = ctx.new_page()
+    org.on('pageerror', lambda e: errors.append(('org pageerror', str(e))))
+    org.on('console', lambda m: errors.append(('org console', m.text)) if m.type == 'error' else None)
+    org.goto(URL + '#/seance/organisateur/s/cme/console'); org.wait_for_timeout(500)
+    org.click('text=Se connecter (démo)'); org.wait_for_timeout(1900)
+    part = ctx.new_page()
+    part.set_viewport_size({'width': 420, 'height': 900})
+    part.on('pageerror', lambda e: errors.append(('part pageerror', str(e))))
+    part.goto(URL + '#/seance/participant'); part.wait_for_timeout(500)
+    part.click('role=tab[name="Code PIN"]'); part.wait_for_timeout(200)
+    part.click('text=Remplir (démo)'); part.click('button[type=submit]'); part.wait_for_timeout(1200)
+    shot(part, '01_part_wait')
+    # organizer opens vote p2
+    org.bring_to_front()
+    org.click('text=Ouvrir le vote'); org.wait_for_timeout(4000)
+    shot(org, '02_org_open', False)
+    part.bring_to_front(); part.wait_for_timeout(500)
+    shot(part, '03_part_ballot')
+    part.click('.bc-btn >> nth=0'); part.click('text=Valider'); part.wait_for_timeout(300)
+    shot(part, '04_part_confirm', False)
+    part.click('.modal >> text=Confirmer'); part.wait_for_timeout(900)
+    part.click('.bc-btn >> nth=2'); part.click('text=Valider'); part.wait_for_timeout(300); part.click('.modal >> text=Confirmer'); part.wait_for_timeout(600)
+    shot(part, '05_part_voted')
+    org.bring_to_front(); org.wait_for_timeout(9000)
+    shot(org, '06_org_progress', False)
+    org.click('text=Clôturer et proclamer'); org.wait_for_timeout(800)
+    shot(org, '07_org_result')
+    part.bring_to_front(); part.wait_for_timeout(500); shot(part, '08_part_result')
+    # election p3
+    org.bring_to_front()
+    org.click('text=Point suivant'); org.wait_for_timeout(400)
+    org.click('text=Ouvrir le vote'); org.wait_for_timeout(1000)
+    part.bring_to_front(); part.wait_for_timeout(500); shot(part, '09_part_election')
+    part.click('.bc-btn >> nth=2'); part.click('text=Valider'); part.wait_for_timeout(300); part.click('.modal >> text=Confirmer'); part.wait_for_timeout(500)
+    org.bring_to_front(); org.wait_for_timeout(22000)
+    org.click('text=Clôturer et proclamer'); org.wait_for_timeout(800)
+    shot(org, '10_org_round1')
+    org.click('text=Organiser le deuxième tour'); org.wait_for_timeout(400); shot(org, '11_r2modal', False)
+    org.click('text=Ouvrir le deuxième tour'); org.wait_for_timeout(23000)
+    org.click('text=Clôturer et proclamer'); org.wait_for_timeout(800)
+    shot(org, '12_org_round2')
+    # classement p5 via agenda
+    org.click('.ag-item:has-text("Programme d’investissement")'); org.wait_for_timeout(300)
+    org.click('text=Ouvrir le vote'); org.wait_for_timeout(800)
+    part.bring_to_front(); part.wait_for_timeout(500); shot(part, '13_part_rank')
+    part.click('text=Valider'); part.wait_for_timeout(300); part.click('.modal >> text=Confirmer'); part.wait_for_timeout(500)
+    org.bring_to_front(); org.wait_for_timeout(22000); org.click('text=Clôturer et proclamer'); org.wait_for_timeout(800); shot(org, '14_org_rank')
+    # quorum break
+    org.click('text=Simuler 20 départs'); org.wait_for_timeout(500); shot(org, '15_quorum', False)
+    org.click('text=Retour des membres'); org.wait_for_timeout(400)
+    # projection
+    proj = ctx.new_page(); proj.set_viewport_size({'width': 1600, 'height': 900})
+    proj.goto(URL + '#/seance/projection/cme'); proj.wait_for_timeout(800); shot(proj, '16_proj', False)
+    # PV
+    org.bring_to_front(); org.evaluate("location.hash='/seance/organisateur/s/cme/pv'"); org.wait_for_timeout(600)
+    org.click('text=Sceller et horodater'); org.wait_for_timeout(1600); shot(org, '17_pv')
+    b.close()
+print(json.dumps(errors, ensure_ascii=False, indent=1)[:4000])
